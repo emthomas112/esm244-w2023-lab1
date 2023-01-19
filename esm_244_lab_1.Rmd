@@ -32,5 +32,78 @@ ggplot(data=top_5_status, aes(x=fct_reorder(legal_status, tree_count),
   theme_minimal()#fct_reorder reorders the x values (legal_status) by tree_count
 ```
 
+Only keep obersvations with permitted trees
+```{r}
+permitted_mta <- sf_trees %>% 
+  filter(legal_status == "Permitted Site", caretaker == "MTA")
+```
 
+**Example 3:** Only keep Blackwood Acacia trees, then only keep columns `legal_status`, `date`, `latitude` and `longitude`. Store as `blackwood_acacia`.
+
+```{r}
+blackwood_acacia <- sf_trees %>% 
+  filter(str_detect(species, "Blackwood Acacia")) %>% 
+  select(legal_status, date, latitude, longitude) 
+  
+ggplot(data = blackwood_acacia, aes(x = longitude, y = latitude)) + 
+  geom_point()
+```
+**Example 4:** Meet `tidyr::separate()`
+
+Separate the `species` column into two separate columns: `spp_scientific` and `spp_common`
+```{r}
+sf_trees_sep <- sf_trees %>% 
+  separate(species, into = c("spp_scientific", "spp_common"), sep = " :: ")
+
+ex_5 <- sf_trees %>% 
+  unite("id_status", tree_id:legal_status, sep = "_COOL_")
+```
+
+### Part 2 Make Maps
+**Step 1:** Convert the lat/lon to spatial points
+
+Use `st_as_sf()` to convert to spatial coordinates: 
+```{r}
+blackwood_acacia_sp <- blackwood_acacia %>% 
+  drop_na(longitude, latitude) %>% 
+  st_as_sf(coords = c("longitude","latitude")) # Convert to spatial coordinates, removes na observations
+
+# But we need to set the coordinate reference system (CRS) so it's compatible with the street map of San Francisco we'll use as a "base layer":
+st_crs(blackwood_acacia_sp) = 4326 # tells r the coordinate reference system is in lat and long degrees
+
+# Then we can use `geom_sf`!
+
+ggplot(data = blackwood_acacia_sp) +
+  geom_sf(color = "darkgreen") +
+  theme_minimal() #geom_sf automatically picks up the geometry column 
+```
+
+Read in the SF shapefile (data/sf_map/tl_2017_06075_roads.shp): 
+```{r}
+sf_map <- read_sf(here("data","sf_map","tl_2017_06075_roads.shp"))
+
+st_transform(sf_map, 4326) #change the CRS from the old to 4326
+
+ggplot(data = sf_map) +
+  geom_sf()
+```
+```{r}
+ggplot() +
+  geom_sf(data = sf_map,
+          size = 0.1,
+          color = "darkgray") +
+  geom_sf(data = blackwood_acacia_sp, 
+          color = "red", 
+          size = 0.5) +
+  theme_void() +
+  labs(title = "Blackwood acacias in San Francisco")
+```
+
+** Interactive map **
+```{r}
+tmap_mode("view")
+
+tm_shape(blackwood_acacia_sp) + 
+  tm_dots()
+```
 
